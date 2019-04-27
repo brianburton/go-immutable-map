@@ -50,7 +50,9 @@ func (this *node) get(hashCode HashCode, key Object, equals EqualsFunc) Object {
 
 func (this *node) delete(hashCode HashCode, key Object, equals EqualsFunc) *node {
 	if hashCode == 0 {
-		if this.key == nil || !equals(this.key, key) {
+		if this.key == nil {
+			return this
+		} else if !equals(this.key, key) {
 			panic("hash collisions not yet supported")
 		} else if this.childCount() == 0 {
 			return nil
