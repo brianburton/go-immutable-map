@@ -7,12 +7,28 @@ type node struct {
 }
 
 func emptyNode() *node {
-	newNode := node{children:make([]*node,32)}
-	return &newNode
+	return &node{}
 }
 
 func indexForHash(hashCode HashCode) int {
 	return int(hashCode & 0x0f)
+}
+
+func (this *node) getChild(index int) *node {
+	if this.children == nil {
+		return nil
+	} else {
+		return this.children[index]
+	}
+}
+
+func (this *node) updatedChildren(index int, child *node) []*node {
+	children := make([]*node, 32)
+	if this.children != nil {
+		copy(children, this.children)
+	}
+	children[index] = child
+	return children
 }
 
 func (this *node) assign(hashCode HashCode, key Object, value Object, equals EqualsFunc) *node {
@@ -30,17 +46,14 @@ func (this *node) assign(hashCode HashCode, key Object, value Object, equals Equ
 		}
 	} else {
 		index := indexForHash(hashCode)
-		oldChild := this.children[index]
+		oldChild := this.getChild(index)
 		if oldChild == nil {
-			oldChild = &node{}
-			oldChild.children = make([]*node, 32)
+			oldChild = emptyNode()
 		}
 		newChild := oldChild.assign(hashCode>>5, key, value, equals)
 
 		newNode := *this
-		newNode.children = make([]*node, 32)
-		copy(newNode.children, this.children)
-		newNode.children[index] = newChild
+		newNode.children = this.updatedChildren(index, newChild)
 		return &newNode
 	}
 }
@@ -54,7 +67,7 @@ func (this *node) get(hashCode HashCode, key Object, equals EqualsFunc) Object {
 		}
 	} else {
 		index := indexForHash(hashCode)
-		oldChild := this.children[index]
+		oldChild := this.getChild(index)
 		if oldChild == nil {
 			return nil
 		} else {
@@ -64,6 +77,9 @@ func (this *node) get(hashCode HashCode, key Object, equals EqualsFunc) Object {
 }
 
 func (this *node) childCount() int {
+	if this.children == nil {
+		return 0
+	}
 	count := 0
 	for _, c := range this.children {
 		if c != nil {
@@ -87,7 +103,7 @@ func (this *node) delete(hashCode HashCode, key Object, equals EqualsFunc) *node
 		}
 	} else {
 		index := indexForHash(hashCode)
-		oldChild := this.children[index]
+		oldChild := this.getChild(index)
 		if oldChild == nil {
 			return this
 		} else {
@@ -96,9 +112,7 @@ func (this *node) delete(hashCode HashCode, key Object, equals EqualsFunc) *node
 				return nil
 			} else {
 				newNode := *this
-				newNode.children = make([]*node, 32)
-				copy(newNode.children, this.children)
-				newNode.children[index] = newChild
+				newNode.children = this.updatedChildren(index, newChild)
 				return &newNode
 			}
 		}
