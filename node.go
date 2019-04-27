@@ -32,10 +32,12 @@ func (this *node) assign(hashCode HashCode, key Object, value Object, equals Equ
 
 func (this *node) get(hashCode HashCode, key Object, equals EqualsFunc) Object {
 	if hashCode == 0 {
-		if this.key == nil || !equals(this.key, key) {
-			panic("hash collisions not yet supported")
-		} else {
+		if this.key == nil {
+			return nil
+		} else if equals(this.key, key) {
 			return this.value
+		} else {
+			panic("hash collisions not yet supported")
 		}
 	} else {
 		index := indexForHash(hashCode)
