@@ -43,7 +43,7 @@ func TestVarious(t *testing.T) {
 		m = m.Delete(key)
 	}
 
-	for i := 2000; i >= 0; i-- {
+	for i := 2000; i >= -5; i-- {
 		key := val(i)
 		m = m.Delete(key)
 	}

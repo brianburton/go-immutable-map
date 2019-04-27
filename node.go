@@ -1,8 +1,13 @@
 package immutableMap
 
+import (
+	"math/bits"
+)
+
 type node struct {
 	key      Object
 	value    Object
+	bitmask  uint32
 	children []*node
 }
 
@@ -70,6 +75,8 @@ func (this *node) delete(hashCode HashCode, key Object, equals EqualsFunc) *node
 			newChild := oldChild.delete(hashCode>>5, key, equals)
 			if newChild == nil && this.key == nil && this.childCount() == 1 {
 				return nil
+			} else if newChild == nil {
+				return this.deleteChild(index)
 			} else {
 				return this.setChild(index, newChild)
 			}
@@ -95,32 +102,70 @@ func (this *node) setKeyAndValue(key Object, value Object) *node {
 }
 
 func (this *node) childCount() int {
-	if this.children == nil {
-		return 0
-	}
-	count := 0
-	for _, c := range this.children {
-		if c != nil {
-			count++
-		}
-	}
-	return count
+	return bits.OnesCount32(this.bitmask)
 }
 
 func (this *node) getChild(index int) *node {
-	if this.children == nil {
+	indexBit := indexBit(index)
+	if this.bitmask&indexBit == 0 {
 		return nil
 	} else {
-		return this.children[index]
+		realIndex := this.realIndex(indexBit)
+		return this.children[realIndex]
 	}
+}
+
+func (this *node) realIndex(indexBit uint32) int {
+	trailingBits := indexBit - 1
+	realIndex := bits.OnesCount32(this.bitmask & trailingBits)
+	return realIndex
+}
+
+func indexBit(index int) uint32 {
+	var indexBit uint32 = 1 << uint32(index)
+	return indexBit
 }
 
 func (this *node) setChild(index int, child *node) *node {
 	newNode := *this
-	newNode.children = make([]*node, 32)
-	if this.children != nil {
-		copy(newNode.children, this.children)
+	indexBit := indexBit(index)
+	if this.children == nil {
+		newNode.children = make([]*node, 1)
+		newNode.children[0] = child
+		newNode.bitmask = indexBit
+	} else {
+		realIndex := this.realIndex(indexBit)
+		if this.bitmask&indexBit != 0 {
+			newNode.children = make([]*node, len(this.children))
+			copy(newNode.children, this.children)
+			newNode.children[realIndex] = child
+		} else {
+			newNode.children = make([]*node, len(this.children)+1)
+			copy(newNode.children, this.children[0:realIndex])
+			newNode.children[realIndex] = child
+			copy(newNode.children[realIndex+1:], this.children[realIndex:])
+			newNode.bitmask |= indexBit
+		}
 	}
-	newNode.children[index] = child
+	return &newNode
+}
+
+func (this *node) deleteChild(index int) *node {
+	indexBit := indexBit(index)
+	if this.bitmask&indexBit == 0 {
+		panic("attempting to delete non-existent child")
+	}
+
+	newNode := *this
+	if this.childCount() == 1 {
+		newNode.children = nil
+		newNode.bitmask = 0
+	} else {
+		realIndex := this.realIndex(indexBit)
+		newNode.children = make([]*node, len(this.children)-1)
+		copy(newNode.children, this.children[0:realIndex])
+		copy(newNode.children[realIndex:], this.children[realIndex+1:])
+		newNode.bitmask &= ^indexBit
+	}
 	return &newNode
 }
