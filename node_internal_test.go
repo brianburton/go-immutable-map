@@ -2,6 +2,7 @@ package immutableMap
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 )
 
@@ -17,12 +18,17 @@ func stringHash(a Object) HashCode {
 	return val
 }
 
+func digitsHash(a Object) HashCode {
+	i, _ := strconv.Atoi(a.(string))
+	return HashCode(i)
+}
+
 func val(index int) string {
 	return fmt.Sprintf("%v", index)
 }
 
 func TestMap(t *testing.T) {
-	m := Create(stringHash, stringEquals)
+	m := CreateMap(stringHash, stringEquals)
 	for i := -2000; i <= 2000; i++ {
 		key := val(i)
 		m = m.Assign(key, i)
@@ -100,4 +106,63 @@ func TestSet(t *testing.T) {
 	if s == nil {
 		t.Error(fmt.Sprintf("can't really happen"))
 	}
+}
+
+func TestMapPaths(t *testing.T) {
+	m := CreateMap(digitsHash, stringEquals)
+
+	m = m.Assign(keyForPath([]int{1, 2, 3}), 3)
+
+	m = m.Delete(keyForPath([]int{1, 2, 3}))
+
+	m = m.Assign(keyForPath([]int{1, 1, 1}), 1)
+	m = m.Assign(keyForPath([]int{1, 2, 2}), 2)
+	m = m.Assign(keyForPath([]int{2, 3, 3}), 3)
+
+	if v := m.Get(keyForPath([]int{1, 1})); v != nil {
+		t.Error(fmt.Sprintf("Get returned %v for key %v", v, keyForPath([]int{1, 1})))
+	}
+
+	m.Delete(keyForPath([]int{1, 1}))
+
+	m = m.Delete(keyForPath([]int{1, 2, 2}))
+	m = m.Delete(keyForPath([]int{1, 1, 1}))
+	m = m.Delete(keyForPath([]int{2, 3, 3}))
+
+	m = nil
+}
+
+func TestSetPaths(t *testing.T) {
+	s := CreateSet(digitsHash, stringEquals)
+
+	s = s.Add(keyForPath([]int{1, 2, 3}))
+
+	s = s.Delete(keyForPath([]int{1, 2, 3}))
+
+	s = s.Add(keyForPath([]int{1, 1, 1}))
+	s = s.Add(keyForPath([]int{1, 2, 2}))
+	s = s.Add(keyForPath([]int{2, 3, 3}))
+
+	if s.Contains(keyForPath([]int{1, 1})) {
+		t.Error(fmt.Sprintf("Contains returned true for key %s", keyForPath([]int{1, 1})))
+	}
+
+	del := s.Delete(keyForPath([]int{1, 1}))
+	if del != s {
+		t.Error(fmt.Sprintf("Delete returned new set for key %s", keyForPath([]int{1, 1})))
+	}
+
+	s = s.Delete(keyForPath([]int{1, 2, 2}))
+	s = s.Delete(keyForPath([]int{1, 1, 1}))
+	s = s.Delete(keyForPath([]int{2, 3, 3}))
+
+	s = nil
+}
+
+func keyForPath(indexes []int) string {
+	key := 0
+	for m, i := range indexes {
+		key += i << (5 * uint(m))
+	}
+	return val(key)
 }

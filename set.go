@@ -33,8 +33,12 @@ func (this *setImpl) Contains(key Object) bool {
 
 func (this *setImpl) Delete(key Object) Set {
 	newRoot := this.root.delete(this.hash(key), key, this.equals)
-	if newRoot == nil {
-		newRoot = emptyNode()
+	if newRoot == this.root {
+		return this
+	} else {
+		if newRoot == nil {
+			newRoot = emptyNode()
+		}
+		return this.withRoot(newRoot)
 	}
-	return this.withRoot(newRoot)
 }

@@ -31,7 +31,11 @@ func (this *node) assign(hashCode HashCode, key Object, value Object, equals Equ
 			oldChild = emptyNode()
 		}
 		newChild := oldChild.assign(hashCode>>5, key, value, equals)
-		return this.setChild(index, newChild)
+		if newChild == oldChild {
+			return this
+		} else {
+			return this.setChild(index, newChild)
+		}
 	}
 }
 
@@ -81,8 +85,8 @@ func (this *node) delete(hashCode HashCode, key Object, equals EqualsFunc) *node
 			return this
 		} else {
 			newChild := oldChild.delete(hashCode>>5, key, equals)
-			if newChild == nil && this.key == nil && this.childCount() == 1 {
-				return nil
+			if newChild == oldChild {
+				return this
 			} else if newChild == nil {
 				return this.deleteChild(index)
 			} else {

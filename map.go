@@ -9,6 +9,10 @@ type Map interface {
 	Get(key Object) Object
 	Delete(key Object) Map
 }
+type MapIterator interface {
+	Next() bool
+	Get() (Object, Object)
+}
 
 type mapImpl struct {
 	hash   HashFunc
@@ -22,7 +26,7 @@ func (this *mapImpl) withRoot(newRoot *node) *mapImpl {
 	return &newMap
 }
 
-func Create(hash HashFunc, equals EqualsFunc) Map {
+func CreateMap(hash HashFunc, equals EqualsFunc) Map {
 	return &mapImpl{hash: hash, equals: equals, root: emptyNode()}
 }
 
