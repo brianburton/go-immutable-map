@@ -11,6 +11,16 @@ type node struct {
 	children []*node
 }
 
+type iteratorState struct {
+	next         *iteratorState
+	currentNode  *node
+	currentIndex int
+}
+
+func (this *node) isEmpty() bool {
+	return this.key == nil && this.bitmask == 0
+}
+
 func emptyNode() *node {
 	return &node{}
 }
@@ -188,4 +198,39 @@ func (this *node) deleteChild(index int) *node {
 		newNode.bitmask &= ^indexBit
 	}
 	return &newNode
+}
+
+func (this *node) createIteratorState(nextState *iteratorState) *iteratorState {
+	if this.isEmpty() {
+		return nextState
+	} else {
+		var startingIndex int
+		if this.key == nil {
+			startingIndex = 0
+		} else {
+			startingIndex = -1
+		}
+		return &iteratorState{currentNode: this, next: nextState, currentIndex: startingIndex}
+	}
+}
+
+func (this *node) next(state *iteratorState) (*iteratorState, Object, Object) {
+	if state == nil || state.currentNode != this {
+		state = this.createIteratorState(state)
+	}
+	if state.currentIndex == -1 {
+		state.currentIndex++
+		if len(this.children) > 0 {
+			return state, this.key, this.value
+		} else {
+			return state.next, this.key, this.value
+		}
+	}
+	child := this.children[state.currentIndex]
+	state.currentIndex++
+	if state.currentIndex == len(this.children) {
+		return child.next(state.next)
+	} else {
+		return child.next(state)
+	}
 }

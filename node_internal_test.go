@@ -135,6 +135,10 @@ func TestMapPaths(t *testing.T) {
 func TestSetPaths(t *testing.T) {
 	s := CreateSet(digitsHash, stringEquals)
 
+	if i := s.Iterate(); i.Next() {
+		t.Error("Next() method on empty set iterator returned true")
+	}
+
 	s = s.Add(keyForPath([]int{1, 2, 3}))
 
 	s = s.Delete(keyForPath([]int{1, 2, 3}))
@@ -157,6 +161,60 @@ func TestSetPaths(t *testing.T) {
 	s = s.Delete(keyForPath([]int{2, 3, 3}))
 
 	s = nil
+}
+
+func TestMapIterator(t *testing.T) {
+	m := CreateMap(digitsHash, stringEquals)
+
+	if i := m.Iterate(); i.Next() {
+		t.Error("Next() method on empty map iterator returned true")
+	}
+
+	m = m.Assign(keyForPath([]int{0}), 0)
+	m = m.Assign(keyForPath([]int{1}), 1)
+	m = m.Assign(keyForPath([]int{1, 1}), 11)
+	m = m.Assign(keyForPath([]int{1, 2}), 12)
+
+	m = m.Assign(keyForPath([]int{1, 2, 3}), 123)
+
+	m = m.Assign(keyForPath([]int{1, 1, 1}), 111)
+	m = m.Assign(keyForPath([]int{1, 2, 2}), 122)
+	m = m.Assign(keyForPath([]int{2, 3, 3}), 233)
+
+	expected := "|0=0|1=1|33=11|1057=111|65=12|2113=122|3137=123|3170=233|"
+	actual := "|"
+	for i := m.Iterate(); i.Next(); {
+		key, value := i.Get()
+		actual += fmt.Sprintf("%v=%v|", key, value)
+	}
+	if actual != expected {
+		t.Error(fmt.Sprintf("iterator mismatch: expected(%s) actual(%s)", expected, actual))
+	}
+}
+
+func TestSetIterator(t *testing.T) {
+	s := CreateSet(digitsHash, stringEquals)
+
+	s = s.Add(keyForPath([]int{0}))
+	s = s.Add(keyForPath([]int{1}))
+	s = s.Add(keyForPath([]int{1, 1}))
+	s = s.Add(keyForPath([]int{1, 2}))
+
+	s = s.Add(keyForPath([]int{1, 2, 3}))
+
+	s = s.Add(keyForPath([]int{1, 1, 1}))
+	s = s.Add(keyForPath([]int{1, 2, 2}))
+	s = s.Add(keyForPath([]int{2, 3, 3}))
+
+	expected := "|0|1|33|1057|65|2113|3137|3170|"
+	actual := "|"
+	for i := s.Iterate(); i.Next(); {
+		value := i.Get()
+		actual += fmt.Sprintf("%v|", value)
+	}
+	if actual != expected {
+		t.Error(fmt.Sprintf("iterator mismatch: expected(%s) actual(%s)", expected, actual))
+	}
 }
 
 func keyForPath(indexes []int) string {

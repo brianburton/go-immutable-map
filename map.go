@@ -8,6 +8,7 @@ type Map interface {
 	Assign(key Object, value Object) Map
 	Get(key Object) Object
 	Delete(key Object) Map
+	Iterate() MapIterator
 }
 type MapIterator interface {
 	Next() bool
@@ -18,6 +19,12 @@ type mapImpl struct {
 	hash   HashFunc
 	equals EqualsFunc
 	root   *node
+}
+
+type mapIteratorImpl struct {
+	state *iteratorState
+	key   Object
+	value Object
 }
 
 func (this *mapImpl) withRoot(newRoot *node) *mapImpl {
@@ -45,4 +52,21 @@ func (this *mapImpl) Delete(key Object) Map {
 		newRoot = emptyNode()
 	}
 	return this.withRoot(newRoot)
+}
+
+func (this *mapImpl) Iterate() MapIterator {
+	return &mapIteratorImpl{state: this.root.createIteratorState(nil)}
+}
+
+func (this *mapIteratorImpl) Next() bool {
+	if this.state == nil {
+		return false
+	} else {
+		this.state, this.key, this.value = this.state.currentNode.next(this.state)
+		return true
+	}
+}
+
+func (this *mapIteratorImpl) Get() (Object, Object) {
+	return this.key, this.value
 }
