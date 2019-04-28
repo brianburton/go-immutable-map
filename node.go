@@ -37,12 +37,10 @@ func (this *node) assign(hashCode HashCode, key Object, value Object, equals Equ
 
 func (this *node) get(hashCode HashCode, key Object, equals EqualsFunc) Object {
 	if hashCode == 0 {
-		if this.key == nil {
+		if this.key == nil || !equals(this.key, key) {
 			return nil
-		} else if equals(this.key, key) {
-			return this.value
 		} else {
-			panic("hash collisions not yet supported")
+			return this.value
 		}
 	} else {
 		index := indexForHash(hashCode)
@@ -52,6 +50,16 @@ func (this *node) get(hashCode HashCode, key Object, equals EqualsFunc) Object {
 		} else {
 			return oldChild.get(hashCode>>5, key, equals)
 		}
+	}
+}
+
+func (this *node) contains(hashCode HashCode, key Object, equals EqualsFunc) bool {
+	if hashCode == 0 {
+		return this.key != nil && equals(this.key, key)
+	} else {
+		index := indexForHash(hashCode)
+		child := this.getChild(index)
+		return child != nil && child.contains(hashCode>>5, key, equals)
 	}
 }
 
@@ -89,9 +97,13 @@ func indexForHash(hashCode HashCode) int {
 }
 
 func (this *node) setValue(value Object) *node {
-	newNode := *this
-	newNode.value = value
-	return &newNode
+	if value == this.value {
+		return this
+	} else {
+		newNode := *this
+		newNode.value = value
+		return &newNode
+	}
 }
 
 func (this *node) setKeyAndValue(key Object, value Object) *node {
@@ -158,8 +170,12 @@ func (this *node) deleteChild(index int) *node {
 
 	newNode := *this
 	if this.childCount() == 1 {
-		newNode.children = nil
-		newNode.bitmask = 0
+		if this.key == nil {
+			return nil
+		} else {
+			newNode.children = nil
+			newNode.bitmask = 0
+		}
 	} else {
 		realIndex := this.realIndex(indexBit)
 		newNode.children = make([]*node, len(this.children)-1)
