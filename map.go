@@ -8,6 +8,7 @@ type Map interface {
 	Assign(key Object, value Object) Map
 	Get(key Object) Object
 	Delete(key Object) Map
+	Keys() Set
 	Iterate() MapIterator
 }
 type MapIterator interface {
@@ -52,6 +53,10 @@ func (this *mapImpl) Delete(key Object) Map {
 		newRoot = emptyNode()
 	}
 	return this.withRoot(newRoot)
+}
+
+func (this *mapImpl) Keys() Set {
+	return keysSet(this)
 }
 
 func (this *mapImpl) Iterate() MapIterator {

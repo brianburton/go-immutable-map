@@ -188,7 +188,17 @@ func TestMapIterator(t *testing.T) {
 		actual += fmt.Sprintf("%v=%v|", key, value)
 	}
 	if actual != expected {
-		t.Error(fmt.Sprintf("iterator mismatch: expected(%s) actual(%s)", expected, actual))
+		t.Error(fmt.Sprintf("map iterator mismatch: expected(%s) actual(%s)", expected, actual))
+	}
+
+	expected = "|0|1|33|1057|65|2113|3137|3170|"
+	actual = "|"
+	for i := m.Keys().Iterate(); i.Next(); {
+		value := i.Get()
+		actual += fmt.Sprintf("%v|", value)
+	}
+	if actual != expected {
+		t.Error(fmt.Sprintf("keys iterator mismatch: expected(%s) actual(%s)", expected, actual))
 	}
 }
 

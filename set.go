@@ -23,6 +23,10 @@ type setIteratorImpl struct {
 	value Object
 }
 
+func keysSet(m *mapImpl) Set {
+	return &setImpl{hash: m.hash, equals: m.equals, root: m.root}
+}
+
 func (this *setImpl) withRoot(newRoot *node) *setImpl {
 	newSet := *this
 	newSet.root = newRoot
