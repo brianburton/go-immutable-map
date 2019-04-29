@@ -1,15 +1,20 @@
 package immutableMap
 
+import "fmt"
+
 type Object interface{}
 type HashCode uint32
 type HashFunc func(Object) HashCode
 type EqualsFunc func(Object, Object) bool
+type reporter func(message string)
+
 type Map interface {
 	Assign(key Object, value Object) Map
 	Get(key Object) Object
 	Delete(key Object) Map
 	Keys() Set
 	Iterate() MapIterator
+	checkInvariants(report reporter)
 }
 type MapIterator interface {
 	Next() bool
@@ -61,6 +66,17 @@ func (this *mapImpl) Keys() Set {
 
 func (this *mapImpl) Iterate() MapIterator {
 	return &mapIteratorImpl{state: this.root.createIteratorState(nil)}
+}
+
+func (this *mapImpl) checkInvariants(report reporter) {
+	this.root.checkInvariants(this.hash, this.equals, 0, report)
+	for i := this.Iterate(); i.Next(); {
+		key, expected := i.Get()
+		actual := this.Get(key)
+		if expected != actual {
+			report(fmt.Sprintf("Get returned incorrect result: key=%v expected=%v actual=%v", key, expected, actual))
+		}
+	}
 }
 
 func (this *mapIteratorImpl) Next() bool {

@@ -1,6 +1,7 @@
 package immutableMap
 
 import (
+	"fmt"
 	"math/bits"
 )
 
@@ -217,11 +218,6 @@ func (this *node) setChild(index int, child *node) *node {
 }
 
 func (this *node) deleteChild(index int) *node {
-	indexBit := indexBit(index)
-	if this.bitmask&indexBit == 0 {
-		panic("attempting to delete non-existent child")
-	}
-
 	newNode := *this
 	if this.childCount() == 1 {
 		if this.keys == nil {
@@ -231,6 +227,7 @@ func (this *node) deleteChild(index int) *node {
 			newNode.bitmask = 0
 		}
 	} else {
+		indexBit := indexBit(index)
 		realIndex := this.realIndex(indexBit)
 		newNode.children = make([]*node, len(this.children)-1)
 		copy(newNode.children, this.children[0:realIndex])
@@ -278,5 +275,33 @@ func (this *node) next(state *iteratorState) (*iteratorState, Object, Object) {
 		return child.next(state.next)
 	} else {
 		return child.next(state)
+	}
+}
+
+func (this *node) checkInvariants(hash HashFunc, equals EqualsFunc, shift uint, report reporter) {
+	for kvp := this.keys; kvp != nil; kvp = kvp.next {
+		for other := kvp.next; other != nil; other = other.next {
+			if equals(kvp.key, other.key) {
+				report(fmt.Sprintf("duplicate key detected: key=%v", kvp.key))
+			}
+		}
+		if shiftedHash := hash(kvp.key) >> shift; shiftedHash != 0 {
+			report(fmt.Sprintf("key with non-zero hash detected: key=%v shiftedHash=%d", kvp.key, shiftedHash))
+		}
+	}
+
+	if this.bitmask != 0 && this.children == nil {
+		report("nil children with non-zero bitmask")
+	} else if this.bitmask == 0 && this.children != nil {
+		report("non-nil children with zero bitmask")
+	}
+
+	if this.children != nil {
+		if bitsLength := bits.OnesCount32(this.bitmask); bitsLength != len(this.children) {
+			report(fmt.Sprintf("bitmask count differs from children length: bitmask=%x bitsLength=%d sliceLength=%d", this.bitmask, bitsLength, len(this.children)))
+		}
+		for _, c := range this.children {
+			c.checkInvariants(hash, equals, shift+5, report)
+		}
 	}
 }

@@ -23,9 +23,9 @@ func numberHash(a Object) HashCode {
 	return HashCode(i)
 }
 
-func divideNumberBy3Hash(a Object) HashCode {
+func divideNumberBy4Hash(a Object) HashCode {
 	i, _ := strconv.Atoi(a.(string))
-	return HashCode(i / 3)
+	return HashCode(i / 4)
 }
 
 func val(index int) string {
@@ -38,9 +38,11 @@ func TestMap(t *testing.T) {
 		key := val(i)
 		m = m.Assign(key, i)
 	}
+	m.checkInvariants(createReporter(t))
 
 	m = m.Assign(val(0), -1)
 	m = m.Assign(val(0), 0)
+	m.checkInvariants(createReporter(t))
 
 	for i := 2000; i >= -2000; i-- {
 		key := val(i)
@@ -54,11 +56,13 @@ func TestMap(t *testing.T) {
 		key := val(i)
 		m = m.Delete(key)
 	}
+	m.checkInvariants(createReporter(t))
 
 	for i := 2000; i >= -5; i-- {
 		key := val(i)
 		m = m.Delete(key)
 	}
+	m.checkInvariants(createReporter(t))
 
 	for i := 2000; i >= -2000; i-- {
 		key := val(i)
@@ -169,7 +173,7 @@ func TestSetPaths(t *testing.T) {
 }
 
 func TestHashCollisions(t *testing.T) {
-	m := CreateMap(divideNumberBy3Hash, stringEquals)
+	m := CreateMap(divideNumberBy4Hash, stringEquals)
 	m = m.Assign(keyForPath([]int{1}), 1)
 	m = m.Assign(keyForPath([]int{2}), 2)
 	m = m.Assign(keyForPath([]int{3}), 3)
@@ -180,11 +184,15 @@ func TestHashCollisions(t *testing.T) {
 	m = m.Assign(keyForPath([]int{6, 1}), 6)
 	m = m.Assign(keyForPath([]int{9, 8, 2}), 7)
 
+	m.checkInvariants(createReporter(t))
+
 	m = m.Delete(keyForPath([]int{4}))
 	m = m.Delete(keyForPath([]int{3, 3}))
+	m.checkInvariants(createReporter(t))
 	m = m.Delete(keyForPath([]int{3, 4}))
 	m = m.Delete(keyForPath([]int{6, 2}))
 	m = m.Delete(keyForPath([]int{9, 8, 9}))
+	m.checkInvariants(createReporter(t))
 
 	verifyValue(t, m, keyForPath([]int{1}), 1)
 	verifyValue(t, m, keyForPath([]int{2}), 2)
@@ -196,7 +204,7 @@ func TestHashCollisions(t *testing.T) {
 	verifyValue(t, m, keyForPath([]int{6, 1}), 6)
 	verifyValue(t, m, keyForPath([]int{9, 8, 2}), 7)
 
-	expected := "|2=2|1=1|3=3|2313=7|67=5|35=4|38=6|"
+	expected := "|3=3|2=2|1=1|67=5|2313=7|35=4|38=6|"
 	actual := "|"
 	for i := m.Iterate(); i.Next(); {
 		key, value := i.Get()
@@ -210,16 +218,19 @@ func TestHashCollisions(t *testing.T) {
 	verifyValue(t, m, keyForPath([]int{1}), nil)
 	verifyValue(t, m, keyForPath([]int{2}), 2)
 	verifyValue(t, m, keyForPath([]int{3}), 3)
+	m.checkInvariants(createReporter(t))
 
 	m = m.Delete(keyForPath([]int{2}))
 	verifyValue(t, m, keyForPath([]int{1}), nil)
 	verifyValue(t, m, keyForPath([]int{2}), nil)
 	verifyValue(t, m, keyForPath([]int{3}), 3)
+	m.checkInvariants(createReporter(t))
 
 	m = m.Delete(keyForPath([]int{3}))
 	verifyValue(t, m, keyForPath([]int{1}), nil)
 	verifyValue(t, m, keyForPath([]int{2}), nil)
 	verifyValue(t, m, keyForPath([]int{3}), nil)
+	m.checkInvariants(createReporter(t))
 
 	verifyValue(t, m, keyForPath([]int{6, 1}), 6)
 	verifyValue(t, m, keyForPath([]int{9, 8, 2}), 7)
@@ -231,6 +242,7 @@ func TestHashCollisions(t *testing.T) {
 	m = m.Delete(keyForPath([]int{3, 2}))
 	verifyValue(t, m, keyForPath([]int{3, 1}), nil)
 	verifyValue(t, m, keyForPath([]int{3, 2}), nil)
+	m.checkInvariants(createReporter(t))
 
 	verifyValue(t, m, keyForPath([]int{6, 1}), 6)
 	verifyValue(t, m, keyForPath([]int{9, 8, 2}), 7)
@@ -238,10 +250,18 @@ func TestHashCollisions(t *testing.T) {
 	m = m.Delete(keyForPath([]int{6, 1}))
 	verifyValue(t, m, keyForPath([]int{6, 1}), nil)
 	verifyValue(t, m, keyForPath([]int{9, 8, 2}), 7)
+	m.checkInvariants(createReporter(t))
 
 	m = m.Delete(keyForPath([]int{9, 8, 2}))
 	verifyValue(t, m, keyForPath([]int{6, 1}), nil)
 	verifyValue(t, m, keyForPath([]int{9, 8, 2}), nil)
+	m.checkInvariants(createReporter(t))
+}
+
+func createReporter(t *testing.T) reporter {
+	return func(message string) {
+		t.Error(message)
+	}
 }
 
 func verifyValue(t *testing.T, m Map, key Object, expected Object) {
