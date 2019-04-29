@@ -30,7 +30,7 @@ func (this *node) assign(hashCode HashCode, key Object, value Object, equals Equ
 		if this.key == nil {
 			return this.setKeyAndValue(key, value)
 		} else if equals(this.key, key) {
-			return this.setValue(value)
+			return this.setKeyAndValue(key, value)
 		} else {
 			panic("hash collisions not yet supported")
 		}
@@ -79,15 +79,7 @@ func (this *node) contains(hashCode HashCode, key Object, equals EqualsFunc) boo
 
 func (this *node) delete(hashCode HashCode, key Object, equals EqualsFunc) *node {
 	if hashCode == 0 {
-		if this.key == nil {
-			return this
-		} else if !equals(this.key, key) {
-			panic("hash collisions not yet supported")
-		} else if this.childCount() == 0 {
-			return nil
-		} else {
-			return this.setKeyAndValue(nil, nil)
-		}
+		return this.deleteKey(key, equals)
 	} else {
 		index := indexForHash(hashCode)
 		oldChild := this.getChild(index)
@@ -110,21 +102,30 @@ func indexForHash(hashCode HashCode) int {
 	return int(hashCode & 0x0f)
 }
 
-func (this *node) setValue(value Object) *node {
-	if value == this.value {
+func (this *node) setKeyAndValue(key Object, value Object) *node {
+	if this.key == key && this.value == value {
 		return this
 	} else {
 		newNode := *this
+		newNode.key = key
 		newNode.value = value
 		return &newNode
 	}
 }
 
-func (this *node) setKeyAndValue(key Object, value Object) *node {
-	newNode := *this
-	newNode.key = key
-	newNode.value = value
-	return &newNode
+func (this *node) deleteKey(key Object, equals EqualsFunc) *node {
+	if this.key == nil {
+		return this
+	} else if !equals(this.key, key) {
+		panic("hash collisions not yet supported")
+	} else if this.childCount() == 0 {
+		return nil
+	} else {
+		newNode := *this
+		newNode.key = nil
+		newNode.value = nil
+		return &newNode
+	}
 }
 
 func (this *node) childCount() int {
