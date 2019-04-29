@@ -4,9 +4,14 @@ import (
 	"math/bits"
 )
 
+type keyValueList struct {
+	next  *keyValueList
+	key   Object
+	value Object
+}
+
 type node struct {
-	key      Object
-	value    Object
+	keys     *keyValueList
 	bitmask  uint32
 	children []*node
 }
@@ -15,10 +20,11 @@ type iteratorState struct {
 	next         *iteratorState
 	currentNode  *node
 	currentIndex int
+	currentKey   *keyValueList
 }
 
 func (this *node) isEmpty() bool {
-	return this.key == nil && this.bitmask == 0
+	return this.keys == nil && this.bitmask == 0
 }
 
 func emptyNode() *node {
@@ -27,13 +33,7 @@ func emptyNode() *node {
 
 func (this *node) assign(hashCode HashCode, key Object, value Object, equals EqualsFunc) *node {
 	if hashCode == 0 {
-		if this.key == nil {
-			return this.setKeyAndValue(key, value)
-		} else if equals(this.key, key) {
-			return this.setKeyAndValue(key, value)
-		} else {
-			panic("hash collisions not yet supported")
-		}
+		return this.setKeyAndValue(key, value, equals)
 	} else {
 		index := indexForHash(hashCode)
 		oldChild := this.getChild(index)
@@ -51,11 +51,7 @@ func (this *node) assign(hashCode HashCode, key Object, value Object, equals Equ
 
 func (this *node) get(hashCode HashCode, key Object, equals EqualsFunc) Object {
 	if hashCode == 0 {
-		if this.key == nil || !equals(this.key, key) {
-			return nil
-		} else {
-			return this.value
-		}
+		return this.getValueForKey(key, equals)
 	} else {
 		index := indexForHash(hashCode)
 		oldChild := this.getChild(index)
@@ -69,7 +65,7 @@ func (this *node) get(hashCode HashCode, key Object, equals EqualsFunc) Object {
 
 func (this *node) contains(hashCode HashCode, key Object, equals EqualsFunc) bool {
 	if hashCode == 0 {
-		return this.key != nil && equals(this.key, key)
+		return this.containsValueForKey(key, equals)
 	} else {
 		index := indexForHash(hashCode)
 		child := this.getChild(index)
@@ -102,28 +98,71 @@ func indexForHash(hashCode HashCode) int {
 	return int(hashCode & 0x0f)
 }
 
-func (this *node) setKeyAndValue(key Object, value Object) *node {
-	if this.key == key && this.value == value {
-		return this
-	} else {
-		newNode := *this
-		newNode.key = key
-		newNode.value = value
-		return &newNode
+func (this *node) containsValueForKey(key Object, equals EqualsFunc) bool {
+	for kvp := this.keys; kvp != nil; kvp = kvp.next {
+		if equals(key, kvp.key) {
+			return true
+		}
 	}
+	return false
+}
+
+func (this *node) getValueForKey(key Object, equals EqualsFunc) Object {
+	for kvp := this.keys; kvp != nil; kvp = kvp.next {
+		if equals(key, kvp.key) {
+			return kvp.value
+		}
+	}
+	return nil
+}
+
+func (this *node) setKeyAndValue(key Object, value Object, equals EqualsFunc) *node {
+	var newKeys *keyValueList
+	if this.keys == nil {
+		newKeys = &keyValueList{key: key, value: value}
+	} else {
+		changed := false
+		for kvp := this.keys; kvp != nil; kvp = kvp.next {
+			if equals(kvp.key, key) {
+				if kvp.value == value {
+					return this
+				}
+				newKeys = &keyValueList{key: key, value: value, next: newKeys}
+				changed = true
+			} else {
+				newKeys = &keyValueList{key: kvp.key, value: kvp.value, next: newKeys}
+			}
+		}
+		if !changed {
+			newKeys = &keyValueList{key: key, value: value, next: this.keys}
+		}
+	}
+	newNode := *this
+	newNode.keys = newKeys
+	return &newNode
 }
 
 func (this *node) deleteKey(key Object, equals EqualsFunc) *node {
-	if this.key == nil {
+	if this.keys == nil {
 		return this
-	} else if !equals(this.key, key) {
-		panic("hash collisions not yet supported")
-	} else if this.childCount() == 0 {
+	}
+
+	changed := false
+	var newKeys *keyValueList
+	for kvp := this.keys; kvp != nil; kvp = kvp.next {
+		if equals(kvp.key, key) {
+			changed = true
+		} else {
+			newKeys = &keyValueList{key: kvp.key, value: kvp.value, next: newKeys}
+		}
+	}
+	if !changed {
+		return this
+	} else if newKeys == nil && this.childCount() == 0 {
 		return nil
 	} else {
 		newNode := *this
-		newNode.key = nil
-		newNode.value = nil
+		newNode.keys = newKeys
 		return &newNode
 	}
 }
@@ -185,7 +224,7 @@ func (this *node) deleteChild(index int) *node {
 
 	newNode := *this
 	if this.childCount() == 1 {
-		if this.key == nil {
+		if this.keys == nil {
 			return nil
 		} else {
 			newNode.children = nil
@@ -206,12 +245,12 @@ func (this *node) createIteratorState(nextState *iteratorState) *iteratorState {
 		return nextState
 	} else {
 		var startingIndex int
-		if this.key == nil {
+		if this.keys == nil {
 			startingIndex = 0
 		} else {
 			startingIndex = -1
 		}
-		return &iteratorState{currentNode: this, next: nextState, currentIndex: startingIndex}
+		return &iteratorState{next: nextState, currentNode: this, currentIndex: startingIndex, currentKey: this.keys}
 	}
 }
 
@@ -220,11 +259,17 @@ func (this *node) next(state *iteratorState) (*iteratorState, Object, Object) {
 		state = this.createIteratorState(state)
 	}
 	if state.currentIndex == -1 {
-		state.currentIndex++
-		if len(this.children) > 0 {
-			return state, this.key, this.value
+		kvp := state.currentKey
+		state.currentKey = kvp.next
+		if state.currentKey != nil {
+			return state, kvp.key, kvp.value
 		} else {
-			return state.next, this.key, this.value
+			state.currentIndex++
+			if len(this.children) > 0 {
+				return state, kvp.key, kvp.value
+			} else {
+				return state.next, kvp.key, kvp.value
+			}
 		}
 	}
 	child := this.children[state.currentIndex]

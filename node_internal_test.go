@@ -18,9 +18,14 @@ func stringHash(a Object) HashCode {
 	return val
 }
 
-func digitsHash(a Object) HashCode {
+func numberHash(a Object) HashCode {
 	i, _ := strconv.Atoi(a.(string))
 	return HashCode(i)
+}
+
+func divideNumberBy3Hash(a Object) HashCode {
+	i, _ := strconv.Atoi(a.(string))
+	return HashCode(i / 3)
 }
 
 func val(index int) string {
@@ -109,7 +114,7 @@ func TestSet(t *testing.T) {
 }
 
 func TestMapPaths(t *testing.T) {
-	m := CreateMap(digitsHash, stringEquals)
+	m := CreateMap(numberHash, stringEquals)
 
 	m = m.Assign(keyForPath([]int{1, 2, 3}), 3)
 
@@ -133,7 +138,7 @@ func TestMapPaths(t *testing.T) {
 }
 
 func TestSetPaths(t *testing.T) {
-	s := CreateSet(digitsHash, stringEquals)
+	s := CreateSet(numberHash, stringEquals)
 
 	if i := s.Iterate(); i.Next() {
 		t.Error("Next() method on empty set iterator returned true")
@@ -163,8 +168,91 @@ func TestSetPaths(t *testing.T) {
 	s = nil
 }
 
+func TestHashCollisions(t *testing.T) {
+	m := CreateMap(divideNumberBy3Hash, stringEquals)
+	m = m.Assign(keyForPath([]int{1}), 1)
+	m = m.Assign(keyForPath([]int{2}), 2)
+	m = m.Assign(keyForPath([]int{3}), 3)
+
+	m = m.Assign(keyForPath([]int{3, 1}), 4)
+	m = m.Assign(keyForPath([]int{3, 2}), 5)
+
+	m = m.Assign(keyForPath([]int{6, 1}), 6)
+	m = m.Assign(keyForPath([]int{9, 8, 2}), 7)
+
+	m = m.Delete(keyForPath([]int{4}))
+	m = m.Delete(keyForPath([]int{3, 3}))
+	m = m.Delete(keyForPath([]int{3, 4}))
+	m = m.Delete(keyForPath([]int{6, 2}))
+	m = m.Delete(keyForPath([]int{9, 8, 9}))
+
+	verifyValue(t, m, keyForPath([]int{1}), 1)
+	verifyValue(t, m, keyForPath([]int{2}), 2)
+	verifyValue(t, m, keyForPath([]int{3}), 3)
+
+	verifyValue(t, m, keyForPath([]int{3, 1}), 4)
+	verifyValue(t, m, keyForPath([]int{3, 2}), 5)
+
+	verifyValue(t, m, keyForPath([]int{6, 1}), 6)
+	verifyValue(t, m, keyForPath([]int{9, 8, 2}), 7)
+
+	expected := "|2=2|1=1|3=3|2313=7|67=5|35=4|38=6|"
+	actual := "|"
+	for i := m.Iterate(); i.Next(); {
+		key, value := i.Get()
+		actual += fmt.Sprintf("%v=%v|", key, value)
+	}
+	if actual != expected {
+		t.Error(fmt.Sprintf("map iterator mismatch: expected(%s) actual(%s)", expected, actual))
+	}
+
+	m = m.Delete(keyForPath([]int{1}))
+	verifyValue(t, m, keyForPath([]int{1}), nil)
+	verifyValue(t, m, keyForPath([]int{2}), 2)
+	verifyValue(t, m, keyForPath([]int{3}), 3)
+
+	m = m.Delete(keyForPath([]int{2}))
+	verifyValue(t, m, keyForPath([]int{1}), nil)
+	verifyValue(t, m, keyForPath([]int{2}), nil)
+	verifyValue(t, m, keyForPath([]int{3}), 3)
+
+	m = m.Delete(keyForPath([]int{3}))
+	verifyValue(t, m, keyForPath([]int{1}), nil)
+	verifyValue(t, m, keyForPath([]int{2}), nil)
+	verifyValue(t, m, keyForPath([]int{3}), nil)
+
+	verifyValue(t, m, keyForPath([]int{6, 1}), 6)
+	verifyValue(t, m, keyForPath([]int{9, 8, 2}), 7)
+
+	m = m.Delete(keyForPath([]int{3, 1}))
+	verifyValue(t, m, keyForPath([]int{3, 1}), nil)
+	verifyValue(t, m, keyForPath([]int{3, 2}), 5)
+
+	m = m.Delete(keyForPath([]int{3, 2}))
+	verifyValue(t, m, keyForPath([]int{3, 1}), nil)
+	verifyValue(t, m, keyForPath([]int{3, 2}), nil)
+
+	verifyValue(t, m, keyForPath([]int{6, 1}), 6)
+	verifyValue(t, m, keyForPath([]int{9, 8, 2}), 7)
+
+	m = m.Delete(keyForPath([]int{6, 1}))
+	verifyValue(t, m, keyForPath([]int{6, 1}), nil)
+	verifyValue(t, m, keyForPath([]int{9, 8, 2}), 7)
+
+	m = m.Delete(keyForPath([]int{9, 8, 2}))
+	verifyValue(t, m, keyForPath([]int{6, 1}), nil)
+	verifyValue(t, m, keyForPath([]int{9, 8, 2}), nil)
+}
+
+func verifyValue(t *testing.T, m Map, key Object, expected Object) {
+	actual := m.Get(key)
+	if actual != expected {
+		t.Error(fmt.Sprintf("Get mismatch: key=%v expected=%v actual=%v", key, expected, actual))
+	}
+}
+
 func TestMapIterator(t *testing.T) {
-	m := CreateMap(digitsHash, stringEquals)
+	m := CreateMap(numberHash, stringEquals)
 
 	if i := m.Iterate(); i.Next() {
 		t.Error("Next() method on empty map iterator returned true")
@@ -203,7 +291,7 @@ func TestMapIterator(t *testing.T) {
 }
 
 func TestSetIterator(t *testing.T) {
-	s := CreateSet(digitsHash, stringEquals)
+	s := CreateSet(numberHash, stringEquals)
 
 	s = s.Add(keyForPath([]int{0}))
 	s = s.Add(keyForPath([]int{1}))
