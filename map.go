@@ -6,6 +6,7 @@ type Object interface{}
 type HashCode uint32
 type HashFunc func(Object) HashCode
 type EqualsFunc func(Object, Object) bool
+type MapVisitor func(Object, Object)
 type reporter func(message string)
 
 type Map interface {
@@ -15,6 +16,7 @@ type Map interface {
 	Keys() Set
 	Size() int
 	Iterate() MapIterator
+	ForEach(v MapVisitor)
 	checkInvariants(report reporter)
 }
 type MapIterator interface {
@@ -75,6 +77,10 @@ func (this *mapImpl) Iterate() MapIterator {
 	return &mapIteratorImpl{state: this.root.createIteratorState(nil)}
 }
 
+func (this *mapImpl) ForEach(v MapVisitor) {
+	this.root.forEach(v)
+}
+
 func (this *mapImpl) checkInvariants(report reporter) {
 	this.root.checkInvariants(this.hash, this.equals, 0, report)
 	size := 0
@@ -89,6 +95,16 @@ func (this *mapImpl) checkInvariants(report reporter) {
 	if this.size != size {
 		report(fmt.Sprintf("Size() does not match number of keys in iterator: expected=%d actual=%d", this.size, size))
 	}
+	i2 := this.Iterate()
+	this.ForEach(func(key Object, value Object) {
+		if !i2.Next() {
+			report(fmt.Sprintf("Next() returned false in ForEach"))
+		}
+		k2, _ := i2.Get()
+		if !this.equals(k2, key) {
+			report(fmt.Sprintf("Key mismatch between ForEach and Iterate: expected=%v actual=%v", k2, key))
+		}
+	})
 }
 
 func (this *mapIteratorImpl) Next() bool {

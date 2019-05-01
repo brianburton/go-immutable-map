@@ -8,6 +8,7 @@ type Set interface {
 	Contains(key Object) bool
 	Size() int
 	Iterate() SetIterator
+	ForEach(v SetVisitor)
 	checkInvariants(report reporter)
 }
 
@@ -15,6 +16,8 @@ type SetIterator interface {
 	Next() bool
 	Get() Object
 }
+
+type SetVisitor func(Object)
 
 type setImpl struct {
 	hash   HashFunc
@@ -68,6 +71,12 @@ func (this *setImpl) Size() int {
 	return this.size
 }
 
+func (this *setImpl) ForEach(v SetVisitor) {
+	this.root.forEach(func(value Object, _ Object) {
+		v(value)
+	})
+}
+
 func (this *setImpl) checkInvariants(report reporter) {
 	this.root.checkInvariants(this.hash, this.equals, 0, report)
 	size := 0
@@ -81,6 +90,16 @@ func (this *setImpl) checkInvariants(report reporter) {
 	if this.size != size {
 		report(fmt.Sprintf("Size() does not match number of keys in iterator: expected=%d actual=%d", this.size, size))
 	}
+	i2 := this.Iterate()
+	this.ForEach(func(key Object) {
+		if !i2.Next() {
+			report(fmt.Sprintf("Next() returned false in ForEach"))
+		}
+		k2 := i2.Get()
+		if !this.equals(k2, key) {
+			report(fmt.Sprintf("Key mismatch between ForEach and Iterate: expected=%v actual=%v", k2, key))
+		}
+	})
 }
 
 func (this *setImpl) Iterate() SetIterator {

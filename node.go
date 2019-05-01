@@ -240,6 +240,17 @@ func (this *node) deleteChild(index int) *node {
 	return &newNode
 }
 
+func (this *node) forEach(v MapVisitor) {
+	for kvp := this.keys; kvp != nil; kvp = kvp.next {
+		v(kvp.key, kvp.value)
+	}
+	if this.children != nil {
+		for _, child := range this.children {
+			child.forEach(v)
+		}
+	}
+}
+
 func (this *node) createIteratorState(nextState *iteratorState) *iteratorState {
 	if this.isEmpty() {
 		return nextState
