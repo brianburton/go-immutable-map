@@ -32,7 +32,7 @@ func emptyNode() *node {
 	return &node{}
 }
 
-func (this *node) assign(hashCode HashCode, key Object, value Object, equals EqualsFunc) *node {
+func (this *node) assign(hashCode HashCode, key Object, value Object, equals EqualsFunc) (*node, int) {
 	if hashCode == 0 {
 		return this.setKeyAndValue(key, value, equals)
 	} else {
@@ -41,11 +41,11 @@ func (this *node) assign(hashCode HashCode, key Object, value Object, equals Equ
 		if oldChild == nil {
 			oldChild = emptyNode()
 		}
-		newChild := oldChild.assign(hashCode>>5, key, value, equals)
+		newChild, delta := oldChild.assign(hashCode>>5, key, value, equals)
 		if newChild == oldChild {
-			return this
+			return this, delta
 		} else {
-			return this.setChild(index, newChild)
+			return this.setChild(index, newChild), delta
 		}
 	}
 }
@@ -74,22 +74,22 @@ func (this *node) contains(hashCode HashCode, key Object, equals EqualsFunc) boo
 	}
 }
 
-func (this *node) delete(hashCode HashCode, key Object, equals EqualsFunc) *node {
+func (this *node) delete(hashCode HashCode, key Object, equals EqualsFunc) (*node, int) {
 	if hashCode == 0 {
 		return this.deleteKey(key, equals)
 	} else {
 		index := indexForHash(hashCode)
 		oldChild := this.getChild(index)
 		if oldChild == nil {
-			return this
+			return this, 0
 		} else {
-			newChild := oldChild.delete(hashCode>>5, key, equals)
+			newChild, delta := oldChild.delete(hashCode>>5, key, equals)
 			if newChild == oldChild {
-				return this
+				return this, 0
 			} else if newChild == nil {
-				return this.deleteChild(index)
+				return this.deleteChild(index), delta
 			} else {
-				return this.setChild(index, newChild)
+				return this.setChild(index, newChild), delta
 			}
 		}
 	}
@@ -117,16 +117,18 @@ func (this *node) getValueForKey(key Object, equals EqualsFunc) Object {
 	return nil
 }
 
-func (this *node) setKeyAndValue(key Object, value Object, equals EqualsFunc) *node {
+func (this *node) setKeyAndValue(key Object, value Object, equals EqualsFunc) (*node, int) {
 	var newKeys *keyValueList
+	delta := 0
 	if this.keys == nil {
 		newKeys = &keyValueList{key: key, value: value}
+		delta = 1
 	} else {
 		changed := false
 		for kvp := this.keys; kvp != nil; kvp = kvp.next {
 			if equals(kvp.key, key) {
 				if kvp.value == value {
-					return this
+					return this, 0
 				}
 				newKeys = &keyValueList{key: key, value: value, next: newKeys}
 				changed = true
@@ -136,16 +138,17 @@ func (this *node) setKeyAndValue(key Object, value Object, equals EqualsFunc) *n
 		}
 		if !changed {
 			newKeys = &keyValueList{key: key, value: value, next: this.keys}
+			delta = 1
 		}
 	}
 	newNode := *this
 	newNode.keys = newKeys
-	return &newNode
+	return &newNode, delta
 }
 
-func (this *node) deleteKey(key Object, equals EqualsFunc) *node {
+func (this *node) deleteKey(key Object, equals EqualsFunc) (*node, int) {
 	if this.keys == nil {
-		return this
+		return this, 0
 	}
 
 	changed := false
@@ -158,13 +161,13 @@ func (this *node) deleteKey(key Object, equals EqualsFunc) *node {
 		}
 	}
 	if !changed {
-		return this
+		return this, 0
 	} else if newKeys == nil && this.childCount() == 0 {
-		return nil
+		return nil, -1
 	} else {
 		newNode := *this
 		newNode.keys = newKeys
-		return &newNode
+		return &newNode, -1
 	}
 }
 

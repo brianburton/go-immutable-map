@@ -13,6 +13,7 @@ type Map interface {
 	Get(key Object) Object
 	Delete(key Object) Map
 	Keys() Set
+	Size() int
 	Iterate() MapIterator
 	checkInvariants(report reporter)
 }
@@ -25,6 +26,7 @@ type mapImpl struct {
 	hash   HashFunc
 	equals EqualsFunc
 	root   *node
+	size   int
 }
 
 type mapIteratorImpl struct {
@@ -33,9 +35,10 @@ type mapIteratorImpl struct {
 	value Object
 }
 
-func (this *mapImpl) withRoot(newRoot *node) *mapImpl {
+func (this *mapImpl) withRoot(newRoot *node, delta int) *mapImpl {
 	newMap := *this
 	newMap.root = newRoot
+	newMap.size += delta
 	return &newMap
 }
 
@@ -44,8 +47,8 @@ func CreateMap(hash HashFunc, equals EqualsFunc) Map {
 }
 
 func (this *mapImpl) Assign(key Object, value Object) Map {
-	newRoot := this.root.assign(this.hash(key), key, value, this.equals)
-	return this.withRoot(newRoot)
+	newRoot, delta := this.root.assign(this.hash(key), key, value, this.equals)
+	return this.withRoot(newRoot, delta)
 }
 
 func (this *mapImpl) Get(key Object) Object {
@@ -53,15 +56,19 @@ func (this *mapImpl) Get(key Object) Object {
 }
 
 func (this *mapImpl) Delete(key Object) Map {
-	newRoot := this.root.delete(this.hash(key), key, this.equals)
+	newRoot, delta := this.root.delete(this.hash(key), key, this.equals)
 	if newRoot == nil {
 		newRoot = emptyNode()
 	}
-	return this.withRoot(newRoot)
+	return this.withRoot(newRoot, delta)
 }
 
 func (this *mapImpl) Keys() Set {
 	return keysSet(this)
+}
+
+func (this *mapImpl) Size() int {
+	return this.size
 }
 
 func (this *mapImpl) Iterate() MapIterator {
@@ -70,12 +77,17 @@ func (this *mapImpl) Iterate() MapIterator {
 
 func (this *mapImpl) checkInvariants(report reporter) {
 	this.root.checkInvariants(this.hash, this.equals, 0, report)
+	size := 0
 	for i := this.Iterate(); i.Next(); {
 		key, expected := i.Get()
 		actual := this.Get(key)
 		if expected != actual {
 			report(fmt.Sprintf("Get returned incorrect result: key=%v expected=%v actual=%v", key, expected, actual))
 		}
+		size++
+	}
+	if this.size != size {
+		report(fmt.Sprintf("Size() does not match number of keys in iterator: expected=%d actual=%d", this.size, size))
 	}
 }
 

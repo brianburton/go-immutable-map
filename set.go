@@ -1,10 +1,14 @@
 package immutableMap
 
+import "fmt"
+
 type Set interface {
 	Add(key Object) Set
 	Delete(key Object) Set
 	Contains(key Object) bool
+	Size() int
 	Iterate() SetIterator
+	checkInvariants(report reporter)
 }
 
 type SetIterator interface {
@@ -16,6 +20,7 @@ type setImpl struct {
 	hash   HashFunc
 	equals EqualsFunc
 	root   *node
+	size   int
 }
 
 type setIteratorImpl struct {
@@ -27,9 +32,10 @@ func keysSet(m *mapImpl) Set {
 	return &setImpl{hash: m.hash, equals: m.equals, root: m.root}
 }
 
-func (this *setImpl) withRoot(newRoot *node) *setImpl {
+func (this *setImpl) withRoot(newRoot *node, delta int) *setImpl {
 	newSet := *this
 	newSet.root = newRoot
+	newSet.size += delta
 	return &newSet
 }
 
@@ -38,8 +44,8 @@ func CreateSet(hash HashFunc, equals EqualsFunc) Set {
 }
 
 func (this *setImpl) Add(key Object) Set {
-	newRoot := this.root.assign(this.hash(key), key, nil, this.equals)
-	return this.withRoot(newRoot)
+	newRoot, delta := this.root.assign(this.hash(key), key, nil, this.equals)
+	return this.withRoot(newRoot, delta)
 }
 
 func (this *setImpl) Contains(key Object) bool {
@@ -47,14 +53,33 @@ func (this *setImpl) Contains(key Object) bool {
 }
 
 func (this *setImpl) Delete(key Object) Set {
-	newRoot := this.root.delete(this.hash(key), key, this.equals)
+	newRoot, delta := this.root.delete(this.hash(key), key, this.equals)
 	if newRoot == this.root {
 		return this
 	} else {
 		if newRoot == nil {
 			newRoot = emptyNode()
 		}
-		return this.withRoot(newRoot)
+		return this.withRoot(newRoot, delta)
+	}
+}
+
+func (this *setImpl) Size() int {
+	return this.size
+}
+
+func (this *setImpl) checkInvariants(report reporter) {
+	this.root.checkInvariants(this.hash, this.equals, 0, report)
+	size := 0
+	for i := this.Iterate(); i.Next(); {
+		value := i.Get()
+		if !this.Contains(value) {
+			report(fmt.Sprintf("value from iterator not found by contains method: value=%v", value))
+		}
+		size++
+	}
+	if this.size != size {
+		report(fmt.Sprintf("Size() does not match number of keys in iterator: expected=%d actual=%d", this.size, size))
 	}
 }
 

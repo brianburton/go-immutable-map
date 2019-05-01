@@ -83,8 +83,10 @@ func TestSet(t *testing.T) {
 		key := val(i)
 		s = s.Add(key)
 	}
+	s.checkInvariants(createReporter(t))
 
 	s = s.Add(val(0))
+	s.checkInvariants(createReporter(t))
 
 	for i := 2000; i >= -2000; i-- {
 		key := val(i)
@@ -93,16 +95,19 @@ func TestSet(t *testing.T) {
 			t.Error(fmt.Sprintf("expected true but got %v for key %v", v, key))
 		}
 	}
+	s.checkInvariants(createReporter(t))
 
 	for i := -2000; i <= 0; i++ {
 		key := val(i)
 		s = s.Delete(key)
 	}
+	s.checkInvariants(createReporter(t))
 
 	for i := 2000; i >= -5; i-- {
 		key := val(i)
 		s = s.Delete(key)
 	}
+	s.checkInvariants(createReporter(t))
 
 	for i := 2000; i >= -2000; i-- {
 		key := val(i)
@@ -111,6 +116,7 @@ func TestSet(t *testing.T) {
 			t.Error(fmt.Sprintf("expected false but got %v for key %v", v, key))
 		}
 	}
+	s.checkInvariants(createReporter(t))
 
 	if s == nil {
 		t.Error(fmt.Sprintf("can't really happen"))
