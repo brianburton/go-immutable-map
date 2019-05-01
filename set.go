@@ -9,6 +9,8 @@ type Set interface {
 	Size() int
 	Iterate() SetIterator
 	ForEach(v SetVisitor)
+	Union(s Set) Set
+	Intersection(s Set) Set
 	checkInvariants(report reporter)
 }
 
@@ -75,6 +77,34 @@ func (this *setImpl) ForEach(v SetVisitor) {
 	this.root.forEach(func(value Object, _ Object) {
 		v(value)
 	})
+}
+
+func (this *setImpl) Union(s Set) Set {
+	var larger, smaller Set
+	if this.Size() > s.Size() {
+		larger, smaller = this, s
+	} else {
+		larger, smaller = s, this
+	}
+	smaller.ForEach(func(v Object) {
+		larger = larger.Add(v)
+	})
+	return larger
+}
+
+func (this *setImpl) Intersection(s Set) Set {
+	var larger, smaller Set
+	if this.Size() > s.Size() {
+		larger, smaller = this, s
+	} else {
+		larger, smaller = s, this
+	}
+	smaller.ForEach(func(v Object) {
+		if !larger.Contains(v) {
+			smaller = smaller.Delete(v)
+		}
+	})
+	return smaller
 }
 
 func (this *setImpl) checkInvariants(report reporter) {

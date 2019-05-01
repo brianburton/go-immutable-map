@@ -2,6 +2,7 @@ package immutableMap
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"testing"
 )
@@ -341,10 +342,79 @@ func TestSetIterator(t *testing.T) {
 	}
 }
 
+func TestSetIntersection(t *testing.T) {
+	a := CreateSet(numberHash, stringEquals)
+	a = a.Add(val(0))
+	a = a.Add(val(2))
+	a = a.Add(val(4))
+	b := CreateSet(numberHash, stringEquals)
+	b = b.Add(val(1))
+	b = b.Add(val(3))
+	b = b.Add(val(5))
+	assertString(sortedSetString(a), "|0|2|4|", t)
+	assertString(sortedSetString(b), "|1|3|5|", t)
+	assertString(sortedSetString(a.Intersection(b)), "|", t)
+	assertString(sortedSetString(b.Intersection(a)), "|", t)
+
+	a = a.Add(val(1))
+	assertString(sortedSetString(a.Intersection(b)), "|1|", t)
+	assertString(sortedSetString(b.Intersection(a)), "|1|", t)
+
+	assertString(sortedSetString(a.Intersection(a)), "|0|1|2|4|", t)
+}
+
+func TestSetUnion(t *testing.T) {
+	a := CreateSet(numberHash, stringEquals)
+	a = a.Add(val(0))
+	a = a.Add(val(2))
+	a = a.Add(val(4))
+	b := CreateSet(numberHash, stringEquals)
+	b = b.Add(val(1))
+	b = b.Add(val(3))
+	b = b.Add(val(5))
+	assertString(sortedSetString(a), "|0|2|4|", t)
+	assertString(sortedSetString(b), "|1|3|5|", t)
+	assertString(sortedSetString(a.Union(b)), "|0|1|2|3|4|5|", t)
+	assertString(sortedSetString(b.Union(a)), "|0|1|2|3|4|5|", t)
+
+	a = a.Delete(val(2))
+	assertString(sortedSetString(a.Union(b)), "|0|1|3|4|5|", t)
+	assertString(sortedSetString(b.Union(a)), "|0|1|3|4|5|", t)
+
+	assertString(sortedSetString(a.Union(a)), "|0|4|", t)
+}
+
+func assertString(actual string, expected string, t *testing.T) {
+	if actual != expected {
+		t.Error(fmt.Sprintf("mismatch: expected(%s) actual(%s)", expected, actual))
+	}
+}
+
 func keyForPath(indexes []int) string {
 	key := 0
 	for m, i := range indexes {
 		key += i << (5 * uint(m))
 	}
 	return val(key)
+}
+
+func sortedSetString(s Set) string {
+	answer := "|"
+	for _, v := range sortedSetValues(s) {
+		answer += fmt.Sprintf("%v|", v)
+	}
+	return answer
+}
+
+func sortedSetValues(s Set) []string {
+	answer := make([]string, s.Size())
+	i := 0
+	s.ForEach(func(v Object) {
+		answer[i] = v.(string)
+		i++
+	})
+	sort.Slice(answer, func(i, j int) bool {
+		return answer[i] < answer[j]
+	})
+	return answer
 }
